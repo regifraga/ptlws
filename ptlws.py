@@ -4,6 +4,7 @@ import sys
 from bs4 import BeautifulSoup
 import requests
 import json
+import base64
 
 #listas
 pages = []
@@ -11,6 +12,7 @@ pages = []
 #constantes
 URL = "https://www.thepiratefilmes.biz/category/filmes/"
 API = "http://movies.api.regifraga.com/api/movie"
+URL_DETAIL = "https://www.thepiratefilmes.biz/magellan-2017-torrent-dublado/"
 
 #métodos auxiliares
 def GetDataFromArrey(data, index):
@@ -133,6 +135,32 @@ def ExtractValues(pageContent):
             finally:
                 print(r.status_code)
 
+def reverse_slicing(s):
+    return s[::-1]
+
+def ExtractDetails(pageContent):
+    for art in pageContent.find_all('article'):
+        id = art.get('id')
+        print(id)
+
+        sinopse = art.find("div", class_="entry").contents[1].text
+        print(sinopse.replace("SINOPSE: ", ""))
+
+        videoLink = art.find("iframe")
+        print(videoLink.get("src"))
+
+        torrentLink = art.find_all("img", class_="alignnone")
+        for img in torrentLink:
+            magnet = img.parent.get("href")
+            startIndex = magnet.index("id=")
+            endIndex = magnet.index("&ref=")
+            #magnetContent = base64.b64decode(reverse_slicing(magnet[startIndex:endIndex]))
+            magnetContent = magnet[startIndex + 3 : endIndex].replace("=", "")
+            magnetContentReverse = reverse_slicing(magnetContent)
+            magnetContentDecode = base64.b64decode(magnetContentReverse)
+            print(magnetContentDecode)
+            print("\n")
+
 #inicializadores
 totalArgs = len(sys.argv) - 1
 totalPages = int(sys.argv[1]) if totalArgs > 1 else 1
@@ -152,7 +180,8 @@ else:
 if totalArgs > 0:
     pages = [URL + "page/" + str(i) for i in range(totalPages, pageEnd)]
 else:
-    pages.append(URL)
+    #pages.append(URL)
+    pages.append(URL_DETAIL)
 
 #inínio
 try:
@@ -168,7 +197,8 @@ try:
                 print("No content found!")
             else:
                 try:
-                    ExtractValues(soup)
+                    #ExtractValues(soup)
+                    ExtractDetails(soup)
                 except Exception, e:
                     print("ERROR > ", str(e))
 except:
