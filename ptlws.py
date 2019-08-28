@@ -12,7 +12,8 @@ pages = []
 #constantes
 URL = "https://www.thepiratefilmes.biz/category/filmes/"
 API = "http://movies.api.regifraga.com/api/movie"
-URL_DETAIL = "https://www.thepiratefilmes.biz/magellan-2017-torrent-dublado/"
+#URL_DETAIL = "https://www.thepiratefilmes.biz/magellan-2017-torrent-dublado/"
+URL_DETAIL = "https://www.thepiratefilmes.biz/apos-a-letargia-2019-torrent-dublado/"
 
 #métodos auxiliares
 def GetDataFromArrey(data, index):
@@ -145,21 +146,32 @@ def ExtractDetails(pageContent):
 
         sinopse = art.find("div", class_="entry").contents[1].text
         print(sinopse.replace("SINOPSE: ", ""))
+        print("\n")
 
         videoLink = art.find("iframe")
         print(videoLink.get("src"))
+        print("\n")
 
-        torrentLink = art.find_all("img", class_="alignnone")
+        torrentLink = art.find_all("img", src="/img/Download.png")
         for img in torrentLink:
             magnet = img.parent.get("href")
             startIndex = magnet.index("id=")
             endIndex = magnet.index("&ref=")
-            #magnetContent = base64.b64decode(reverse_slicing(magnet[startIndex:endIndex]))
+
+            imgInfo = img.parent.parent.previous_sibling
+            imgInfoTitle = ''.join(unicode(caption.string) for caption in imgInfo.previous_sibling.contents)
+            imgInfoSize = imgInfo.string.string.replace("|", "")
+            print("%s (%s)" %(imgInfoTitle.rstrip(), imgInfoSize.strip()))
+            
             magnetContent = magnet[startIndex + 3 : endIndex].replace("=", "")
             magnetContentReverse = reverse_slicing(magnetContent)
-            magnetContentDecode = base64.b64decode(magnetContentReverse)
+            magnetContentDecode = base64.b64decode(magnetContentReverse + '=' * (-len(magnetContentReverse) % 4))
             print(magnetContentDecode)
             print("\n")
+
+        subtitleLink = art.find_all("strong", string="DOWNLOAD LEGENDA")
+        for sub in subtitleLink:
+            print(sub.parent.get("href"))
 
 #inicializadores
 totalArgs = len(sys.argv) - 1
@@ -175,7 +187,7 @@ for i in range(1, len(sys.argv)):
 if totalArgs == 1:
     print("Total Args: %s\nTotal Pages: %s\nTest mode: %s\n%s" %(totalArgs, totalPages, isTest, "=" * 60))
 else:
-    print("Total Args: %s\nStart Page: %s\nEnd PAge: %s\nTest mode: %s\n%s" %(totalArgs, totalPages, pageEnd, isTest, "=" * 60))
+    print("Total Args: %s\nStart Page: %s\nEnd Page: %s\nTest mode: %s\n%s" %(totalArgs, totalPages, pageEnd, isTest, "=" * 60))
 
 if totalArgs > 0:
     pages = [URL + "page/" + str(i) for i in range(totalPages, pageEnd)]
