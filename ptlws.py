@@ -13,7 +13,7 @@ pages = []
 URL = "https://www.thepiratefilmes.biz/category/filmes/"
 API = "http://movies.api.regifraga.com/api/movie"
 #URL_DETAIL = "https://www.thepiratefilmes.biz/magellan-2017-torrent-dublado/"
-URL_DETAIL = "https://www.thepiratefilmes.biz/apos-a-letargia-2019-torrent-dublado/"
+#URL_DETAIL = "https://www.thepiratefilmes.biz/apos-a-letargia-2019-torrent-dublado/"
 
 #métodos auxiliares
 def GetDataFromArrey(data, index):
@@ -23,7 +23,7 @@ def GetDataFromArrey(data, index):
     value = data[index].split(": ")
     return value[len(value) - 1].strip()
 
-def CreateJSON(data):
+def CreateJsonMovie(data):
     #valores padrão
     jsonData = {
         "id": "",
@@ -52,19 +52,6 @@ def CreateJSON(data):
         "dubbed": 0,
         "torrents": []
     }
-
-    #Título do Filme: Duendes e Dragões
-    #Gênero: Fantasia, Terror, Thriller
-    #Áudio:  Português, Inglês
-    #Legenda: S/ L.
-    #Formato: MKV
-    #Qualidade: WEB-DL 720p, 1080p
-    #Tamanho: 1 GB, 1.7 GB
-    #Ano de Lançamento: 2019
-    #Duração: 1h 30Min.
-    #Qualidade de Áudio:  10
-    #Qualidade de Vídeo: 10
-    #IMDb: 3.5/10
 
     #atribui os valores ao json a ser enviado
     for d in data:
@@ -118,7 +105,7 @@ def ExtractValues(pageContent):
         ditailLink = art.find("a", class_="continue-reading")
 
         movieData = info.text.splitlines()
-        jsonData = CreateJSON(movieData)
+        jsonData = CreateJsonMovie(movieData)
         jsonData["id"] = id
         jsonData["posterBig"] = img
         jsonData["posterMed"] = img
@@ -131,29 +118,50 @@ def ExtractValues(pageContent):
             print(json.dumps(jsonData, indent=4, sort_keys=True))
         else:
             try:
-                print(id)
+                print("%s..." %(id)),
                 r = requests.post(API, json=jsonData)
             finally:
-                print(r.status_code)
+                print("status_code: %s" %(r.status_code))
 
 def reverse_slicing(s):
     return s[::-1]
 
-def ExtractDetails(pageContent):
+def ExtractDetails(jsonMovie, pageContent):
+    torrents = []
+
     for art in pageContent.find_all('article'):
+        jsonTorrent = {
+            "id": "",
+            "movieId": "",
+            "quality": "",
+            "size": "",
+            "torrentMagnet": "",
+            "torrentUrl": ""
+        }
+        
         id = art.get('id')
         print(id)
 
-        sinopse = art.find("div", class_="entry").contents[1].text
-        print(sinopse.replace("SINOPSE: ", ""))
-        print("\n")
+        sinopse = art.find("div", class_="entry").contents[1].text.replace("SINOPSE: ", "")
+        jsonMovie["description"] = sinopse.replace("SINOPSE:", "").strip()
 
-        videoLink = art.find("iframe")
-        print(videoLink.get("src"))
-        print("\n")
+        videoLink = art.find("iframe").get("src")
+        jsonMovie["trailerLink"] = videoLink
 
+        idx = 0
         torrentLink = art.find_all("img", src="/img/Download.png")
+
         for img in torrentLink:
+            idx += 1
+            jsonTorrent["id"] = id + art.header.h1.a.text + "__" + str(idx)
+            jsonTorrent["movieId"] = id
+
+            print(idx)
+
+            if isTest:
+                print(img)
+                print(jsonTorrent)
+
             magnet = img.parent.get("href")
             startIndex = magnet.index("id=")
             endIndex = magnet.index("&ref=")
@@ -161,57 +169,92 @@ def ExtractDetails(pageContent):
             imgInfo = img.parent.parent.previous_sibling
             imgInfoTitle = ''.join(unicode(caption.string) for caption in imgInfo.previous_sibling.contents)
             imgInfoSize = imgInfo.string.string.replace("|", "")
-            print("%s (%s)" %(imgInfoTitle.rstrip(), imgInfoSize.strip()))
-            
+            jsonTorrent["quality"] = imgInfoTitle.rstrip()
+            jsonTorrent["size"] = imgInfoSize.strip()
+
+            #decript the link
             magnetContent = magnet[startIndex + 3 : endIndex].replace("=", "")
             magnetContentReverse = reverse_slicing(magnetContent)
             magnetContentDecode = base64.b64decode(magnetContentReverse + '=' * (-len(magnetContentReverse) % 4))
-            print(magnetContentDecode)
-            print("\n")
+            jsonTorrent["torrentMagnet"] = magnetContentDecode
+
+            torrents.append(jsonTorrent)
 
         subtitleLink = art.find_all("strong", string="DOWNLOAD LEGENDA")
         for sub in subtitleLink:
-            print(sub.parent.get("href"))
+            subLink = sub.parent.get("href")
+            jsonMovie["SubtitleLink"] += subLink
+
+        jsonMovie["torrents"] = torrents
+
+        if isTest:
+            print(json.dumps(jsonMovie, indent=4, sort_keys=True))
+        else:
+            r = requests.put(API + "/" + id, json=jsonMovie)
+            print(r.status_code)
 
 #inicializadores
 totalArgs = len(sys.argv) - 1
 totalPages = int(sys.argv[1]) if totalArgs > 1 else 1
-pageEnd = int(sys.argv[2]) + 1 if totalArgs > 2 else totalPages + 1
+pageEnd = int(sys.argv[2]) + 1 if totalArgs >= 2 else totalPages + 1
 isTest = False
+isDetail = False
 
 for i in range(1, len(sys.argv)):
     if str(sys.argv[i]).lower() == "test":
         isTest = True
-        break
+    elif str(sys.argv[i]).lower() == "detail":
+        isDetail = True
 
 if totalArgs == 1:
-    print("Total Args: %s\nTotal Pages: %s\nTest mode: %s\n%s" %(totalArgs, totalPages, isTest, "=" * 60))
+    print("Total Args: %s\nTotal Pages: %s\nTest mode: %s\nDetail: %s\n%s" %(totalArgs, totalPages, isTest, isDetail, "=" * 60))
 else:
-    print("Total Args: %s\nStart Page: %s\nEnd Page: %s\nTest mode: %s\n%s" %(totalArgs, totalPages, pageEnd, isTest, "=" * 60))
+    print("Total Args: %s\nStart Page: %s\nEnd Page: %s\nTest mode: %s\nDetail: %s\n%s" %(totalArgs, totalPages, pageEnd, isTest, isDetail, "=" * 60))
 
-if totalArgs > 0:
-    pages = [URL + "page/" + str(i) for i in range(totalPages, pageEnd)]
+if totalArgs > 1:
+    if isDetail:
+        url = "http://movies.api.regifraga.com/api/movie/%s/1"
+        pages = [url %(i) for i in range(totalPages, pageEnd)]
+    else:
+        pages = [URL + "page/" + str(i) for i in range(totalPages, pageEnd)]
+elif totalArgs == 1:
+    pages.append(URL + "page/" + sys.argv[1])
 else:
-    #pages.append(URL)
-    pages.append(URL_DETAIL)
+    pages.append(URL)
 
 #inínio
 try:
+    print("Total page(s): %s" %(len(pages)))
+
     for page in pages:
-        print("Getting %s..."%(page))
+        print("\nGetting %s..."%(page)),
         res = requests.get(page)
 
-        if res.status_code == 200:
-            print("status_code == 200")
-            soup = BeautifulSoup(res.text, "html.parser")
+        if res:
+            print("status_code: %s" %(res.status_code))
 
-            if len(res.text) == 0:
-                print("No content found!")
-            else:
+            if isDetail:
+                jsonData = res.json()[0]
+                detailLink = jsonData['ditailLink']
+                
+                if isTest:
+                    print(jsonData)
+
+                print("\nGetting detail %s..." %(detailLink))
+                res = requests.get(detailLink)
+                soup = BeautifulSoup(res.text, "html.parser")
+
                 try:
-                    #ExtractValues(soup)
-                    ExtractDetails(soup)
+                    ExtractDetails(jsonData, soup)
                 except Exception, e:
-                    print("ERROR > ", str(e))
+                    print("ERROR on ExtractDetails!", str(e))
+                    continue
+            elif len(res.text) != 0:
+                try:
+                    soup = BeautifulSoup(res.text, "html.parser")
+                    ExtractValues(soup)
+                except Exception, e:
+                    print("ERROR on ExtractValues!", str(e))
+                    continue
 except:
     print("ERROR >>> ", sys.exc_info()[0])
