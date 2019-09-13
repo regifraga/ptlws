@@ -130,15 +130,6 @@ def ExtractDetails(jsonMovie, pageContent):
     torrents = []
 
     for art in pageContent.find_all('article'):
-        jsonTorrent = {
-            "id": "",
-            "movieId": "",
-            "quality": "",
-            "size": "",
-            "torrentMagnet": "",
-            "torrentUrl": ""
-        }
-        
         id = art.get('id')
         print(id)
 
@@ -152,6 +143,15 @@ def ExtractDetails(jsonMovie, pageContent):
         torrentLink = art.find_all("img", src="/img/Download.png")
 
         for img in torrentLink:
+            jsonTorrent = {
+                "id": "",
+                "movieId": "",
+                "quality": "",
+                "size": "",
+                "torrentMagnet": "",
+                "torrentUrl": ""
+            }
+            
             idx += 1
             jsonTorrent["id"] = id + art.header.h1.a.text + "__" + str(idx)
             jsonTorrent["movieId"] = id
@@ -176,7 +176,7 @@ def ExtractDetails(jsonMovie, pageContent):
             magnetContent = magnet[startIndex + 3 : endIndex].replace("=", "")
             magnetContentReverse = reverse_slicing(magnetContent)
             magnetContentDecode = base64.b64decode(magnetContentReverse + '=' * (-len(magnetContentReverse) % 4))
-            jsonTorrent["torrentMagnet"] = magnetContentDecode
+            jsonTorrent["torrentMagnet"] = str(magnetContentDecode)
 
             torrents.append(jsonTorrent)
 
@@ -190,8 +190,17 @@ def ExtractDetails(jsonMovie, pageContent):
         if isTest:
             print(json.dumps(jsonMovie, indent=4, sort_keys=True))
         else:
-            r = requests.put(API + "/" + id, json=jsonMovie)
-            print(r.status_code)
+            putAddress = API + "/" + id
+            print("PUT to %s..." %(putAddress))
+            headers = {"Content-Type": "application/json"}
+
+            print(json.dumps(jsonMovie, indent=4, sort_keys=True))
+
+            r = requests.put(putAddress, data=json.dumps(jsonMovie, indent=4, sort_keys=True), headers=headers)
+            print(r.status_code),
+
+            if r.status_code == 500:
+                print(r.text())
 
 #inicializadores
 totalArgs = len(sys.argv) - 1
@@ -227,7 +236,7 @@ try:
     print("Total page(s): %s" %(len(pages)))
 
     for page in pages:
-        print("\nGetting %s..."%(page)),
+        print("\n%s\nGetting %s..."%('/' * 60, page)),
         res = requests.get(page)
 
         if res:
@@ -238,7 +247,7 @@ try:
                 detailLink = jsonData['ditailLink']
                 
                 if isTest:
-                    print(jsonData)
+                    print(json.dumps(jsonData, indent=4, sort_keys=True))
 
                 print("\nGetting detail %s..." %(detailLink))
                 res = requests.get(detailLink)
