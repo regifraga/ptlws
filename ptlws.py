@@ -118,7 +118,7 @@ def ExtractValues(pageContent):
             print(json.dumps(jsonData, indent=4, sort_keys=True))
         else:
             try:
-                print("%s..." %(id)),
+                print("(%s) %s..." %(id, unicode(jsonData["title"]))),
                 r = requests.post(API, json=jsonData)
             finally:
                 print("status_code: %s" %(r.status_code))
